@@ -1,0 +1,4 @@
+.env
+certs/*.pem
+data/store.json
+node_modules/

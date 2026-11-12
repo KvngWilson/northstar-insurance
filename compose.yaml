@@ -1,0 +1,34 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8443:8443"
+    environment:
+      NODE_ENV: development
+      PORT: "8443"
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the root .env file}
+      JWT_EXPIRES_IN: 1h
+      FRONTEND_ORIGIN: http://localhost:3000
+      DATA_FILE: data/store.json
+      TLS_KEY: certs/localhost-key.pem
+      TLS_CERT: certs/localhost.pem
+    volumes:
+      - northstar_data:/app/data
+      - northstar_certs:/app/certs
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: https://localhost:8443/api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  northstar_data:
+  northstar_certs:
