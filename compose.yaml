@@ -9,13 +9,18 @@ services:
       PORT: "8443"
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the root .env file}
       JWT_EXPIRES_IN: 1h
-      FRONTEND_ORIGIN: http://localhost:3000
+      FRONTEND_ORIGIN: https://localhost:3000
       DATA_FILE: data/store.json
       TLS_KEY: certs/localhost-key.pem
       TLS_CERT: certs/localhost.pem
     volumes:
       - northstar_data:/app/data
       - northstar_certs:/app/certs
+    healthcheck:
+      test: ["CMD", "node", "-e", "const https=require('node:https');https.get('https://localhost:8443/api/health',{ca:require('node:fs').readFileSync('/app/certs/localhost.pem')},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
     restart: unless-stopped
 
   frontend:
@@ -26,7 +31,10 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    volumes:
+      - northstar_certs:/app/certs:ro
     restart: unless-stopped
 
 volumes:

@@ -46,6 +46,8 @@ for (const [username, role, firstName, lastName] of credentials) {
     jobTitle: role,
     supervisorId: "",
     assignedAgentId: "",
+    internalAccessStatus: role === "customer" ? "not_applicable" : "active",
+    beneficiaryName: "",
     createdAt: stamp(),
     updatedAt: stamp(),
     lastLogin: null,

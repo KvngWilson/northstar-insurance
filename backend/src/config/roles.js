@@ -9,6 +9,6 @@ export const ROLES = [
 ];
 export const INTERNAL = ROLES.filter((r) => r !== "customer");
 export const userPublic = (u) => {
-  const { passwordHash, ...safe } = u;
+  const { passwordHash, authVersion, ...safe } = u;
   return safe;
 };
