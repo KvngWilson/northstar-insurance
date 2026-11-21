@@ -104,8 +104,14 @@ const serviceProjection = (user) => ({
   status: user.status,
   userType: user.userType,
 });
+const isCustomerRecord = (user) =>
+  user != null &&
+  Array.isArray(user.roles) &&
+  user.roles.length === 1 &&
+  user.roles[0] === "customer" &&
+  (user.userType == null || user.userType === "customer");
 const supportVisible = (db, customer, actor) => {
-  if (!customer || customer.userType !== "customer") return false;
+  if (!isCustomerRecord(customer)) return false;
   if (actor.roles.includes("service")) return true;
   if (actor.roles.includes("agent"))
     return (
@@ -270,7 +276,7 @@ users.patch(
     const db = load(),
       user = get(db, "users", req.params.id);
     if (!user) fail(404, "User not found");
-    if (user.userType !== "customer")
+    if (!isCustomerRecord(user))
       fail(403, "Only customer contact details may be updated here");
     if (
       !req.user.roles.includes("admin") &&
