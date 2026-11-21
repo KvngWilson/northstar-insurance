@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "../lib/api";
 const fields = {
   profile: [
@@ -8,11 +8,50 @@ const fields = {
     "email",
     "phone",
     "addressLine1",
+    "addressLine2",
     "city",
     "province",
     "postalCode",
     "country",
     "preferredContact",
+    "emergencyContactName",
+    "emergencyContactPhone",
+  ],
+  supportProfile: [
+    "email",
+    "phone",
+    "addressLine1",
+    "addressLine2",
+    "city",
+    "province",
+    "postalCode",
+    "country",
+    "preferredContact",
+  ],
+  adminProfile: [
+    "firstName",
+    "lastName",
+    "dateOfBirth",
+    "email",
+    "phone",
+    "addressLine1",
+    "addressLine2",
+    "city",
+    "province",
+    "postalCode",
+    "country",
+    "preferredContact",
+    "emergencyContactName",
+    "emergencyContactPhone",
+    "customerNumber",
+    "employeeNumber",
+    "department",
+    "jobTitle",
+    "supervisorId",
+    "internalAccessStatus",
+    "clientCategory",
+    "assignedAgentId",
+    "beneficiaryName",
   ],
   policy: [
     "customerId",
@@ -52,8 +91,47 @@ const formPayload = (form) =>
     Object.entries(form).map(([k, v]) => [k, numeric.has(k) ? Number(v) : v]),
   );
 const has = (u, ...roles) => roles.some((r) => u?.roles?.includes(r));
-function Form({ title, keys, onSubmit, initial = {}, button = "Submit" }) {
-  const [form, setForm] = useState(initial);
+function Form({
+  title,
+  keys,
+  onSubmit,
+  initial = {},
+  button = "Submit",
+  policies = [],
+}) {
+  const [form, setForm] = useState(() =>
+    Object.fromEntries(
+      keys
+        .filter((key) => initial[key] !== undefined)
+        .map((key) => [key, initial[key]]),
+    ),
+  );
+  // Only editable fields are sent; authentication/role metadata is never included.
+  // Form instances remount after server refresh via the parent's updatedAt key.
+  const required = new Set([
+    "username",
+    "password",
+    "firstName",
+    "lastName",
+    "email",
+    "customerId",
+    "insuranceType",
+    "coverageAmount",
+    "premiumAmount",
+    "effectiveDate",
+    "expiryDate",
+    "policyId",
+    "requestType",
+    "currentValue",
+    "requestedValue",
+    "currentCoverage",
+    "requestedCoverage",
+    "reason",
+    "claimType",
+    "incidentDate",
+    "claimAmount",
+    "description",
+  ]);
   return (
     <form
       className="panel"
@@ -67,26 +145,89 @@ function Form({ title, keys, onSubmit, initial = {}, button = "Submit" }) {
         {keys.map((k) => (
           <label key={k}>
             <span>{k.replace(/([A-Z])/g, " $1")}</span>
-            <input
-              required={
-                ![
-                  "addressLine1",
-                  "preferredContact",
-                  "phone",
-                  "postalCode",
-                ].includes(k)
-              }
-              type={
-                k.toLowerCase().includes("date")
-                  ? "date"
-                  : numeric.has(k)
-                    ? "number"
-                    : "text"
-              }
-              step={numeric.has(k) ? "any" : undefined}
-              value={form[k] ?? ""}
-              onChange={(e) => setForm({ ...form, [k]: e.target.value })}
-            />
+            {k === "policyId" && policies.length ? (
+              <select
+                required
+                value={form[k] ?? ""}
+                onChange={(e) => {
+                  const found = policies.find((p) => p.id === e.target.value);
+                  setForm({
+                    ...form,
+                    policyId: e.target.value,
+                    ...(found && keys.includes("currentValue")
+                      ? { currentValue: found.coverageAmount }
+                      : {}),
+                    ...(found && keys.includes("currentCoverage")
+                      ? { currentCoverage: found.coverageAmount }
+                      : {}),
+                  });
+                }}
+              >
+                <option value="">Select a policy</option>
+                {policies.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.policyNumber} ({p.insuranceType})
+                  </option>
+                ))}
+              </select>
+            ) : k === "insuranceType" ? (
+              <select
+                required
+                value={form[k] ?? ""}
+                onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+              >
+                <option value="">Select an insurance type</option>
+                {["life", "car", "home"].map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            ) : k === "preferredContact" ? (
+              <select
+                value={form[k] ?? "email"}
+                onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+              >
+                {["email", "phone", "mail"].map((method) => (
+                  <option key={method} value={method}>
+                    {method}
+                  </option>
+                ))}
+              </select>
+            ) : k === "internalAccessStatus" ? (
+              <select
+                value={form[k] ?? "not_applicable"}
+                onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+              >
+                {["active", "suspended", "not_applicable"].map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                required={
+                  required.has(k) &&
+                  !title.startsWith("Update ") &&
+                  !title.startsWith("Edit ")
+                }
+                type={
+                  k === "password"
+                    ? "password"
+                    : k === "email"
+                      ? "email"
+                      : k.toLowerCase().includes("date")
+                        ? "date"
+                        : numeric.has(k)
+                          ? "number"
+                          : "text"
+                }
+                step={numeric.has(k) ? "any" : undefined}
+                value={form[k] ?? ""}
+                onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+              />
+            )}
           </label>
         ))}
       </div>
@@ -101,16 +242,38 @@ export default function Home() {
     [tab, setTab] = useState("dashboard"),
     [data, setData] = useState({}),
     [message, setMessage] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [newUserRole, setNewUserRole] = useState("customer"),
+    [selectedUserId, setSelectedUserId] = useState(""),
+    [selectedProfile, setSelectedProfile] = useState(null);
   const fetchAll = async (t, u) => {
     const requests = [
       ["profile", "/users/me"],
       ["policies", "/policies"],
-      ["amendments", "/amendments"],
-      ["reductions", "/reductions"],
-      ["claims", "/claims"],
     ];
-    if (has(u, "admin", "compliance")) requests.push(["users", "/users"]);
+    if (
+      has(
+        u,
+        "customer",
+        "agent",
+        "underwriter",
+        "service",
+        "compliance",
+        "admin",
+      )
+    ) {
+      requests.push(
+        ["amendments", "/amendments"],
+        ["reductions", "/reductions"],
+      );
+    }
+    if (
+      has(u, "customer", "agent", "adjuster", "service", "compliance", "admin")
+    )
+      requests.push(["claims", "/claims"]);
+    if (has(u, "admin", "compliance", "agent", "service"))
+      requests.push(["users", "/users"]);
+    if (has(u, "admin", "compliance")) requests.push(["audits", "/audits"]);
     if (has(u, "admin")) requests.push(["roles", "/rbac/roles"]);
     const entries = await Promise.all(
       requests.map(async ([key, path]) => {
@@ -144,12 +307,31 @@ export default function Home() {
     try {
       const result = await api(path, { method, body, token });
       setMessage("Saved successfully");
+      if (result?.user?.id === selectedUserId) setSelectedProfile(result.user);
+      if (result?.user?.id === user?.id) setUser(result.user);
       await fetchAll(token, user);
       return result;
     } catch (e) {
-      setMessage(e.message);
+      if (e.status === 401) {
+        setToken("");
+        setUser(null);
+        setData({});
+        setMessage(
+          "Your session expired or access changed. Please sign in again.",
+        );
+      } else setMessage(e.message);
     } finally {
       setBusy(false);
+    }
+  };
+  const openProfile = async (id) => {
+    setSelectedUserId(id);
+    setSelectedProfile(null);
+    if (!id) return;
+    try {
+      setSelectedProfile((await api(`/users/${id}`, { token })).user);
+    } catch (e) {
+      setMessage(e.message);
     }
   };
   const logout = () => {
@@ -157,13 +339,16 @@ export default function Home() {
     setUser(null);
     setData({});
     setMessage("");
+    setSelectedUserId("");
+    setSelectedProfile(null);
     setLogin({ ...login, password: "" });
   };
   const policies = data.policies?.policies || [],
     amendments = data.amendments?.amendments || [],
     reductions = data.reductions?.reductions || [],
     claims = data.claims?.claims || [],
-    users = data.users?.users || [];
+    users = data.users?.users || [],
+    audits = data.audits?.audits || [];
   const portal = has(user, "admin")
     ? "Administration"
     : has(user, "customer")
@@ -173,10 +358,30 @@ export default function Home() {
     "dashboard",
     "profile",
     "policies",
-    "amendments",
-    "reductions",
-    "claims",
-    ...(has(user, "admin", "compliance") ? ["users"] : []),
+    ...(has(
+      user,
+      "customer",
+      "agent",
+      "underwriter",
+      "service",
+      "compliance",
+      "admin",
+    )
+      ? ["amendments", "reductions"]
+      : []),
+    ...(has(
+      user,
+      "customer",
+      "agent",
+      "adjuster",
+      "service",
+      "compliance",
+      "admin",
+    )
+      ? ["claims"]
+      : []),
+    ...(has(user, "admin", "compliance", "agent", "service") ? ["users"] : []),
+    ...(has(user, "admin", "compliance") ? ["audits"] : []),
     ...(has(user, "admin") ? ["rbac"] : []),
   ];
   return (
@@ -328,8 +533,49 @@ export default function Home() {
                     {user.status} · <b>Roles:</b> {user.roles.join(", ")}
                   </p>
                 </section>
+                {data.profile?.user && (
+                  <section className="panel">
+                    <h3>Full user profile (read only)</h3>
+                    <dl className="profilegrid">
+                      {[
+                        "userId",
+                        "firstName",
+                        "lastName",
+                        "userType",
+                        "dateOfBirth",
+                        "email",
+                        "phone",
+                        "addressLine1",
+                        "addressLine2",
+                        "city",
+                        "province",
+                        "postalCode",
+                        "country",
+                        "customerNumber",
+                        "employeeNumber",
+                        "preferredContact",
+                        "emergencyContactName",
+                        "emergencyContactPhone",
+                        "department",
+                        "jobTitle",
+                        "supervisorId",
+                        "internalAccessStatus",
+                        "clientCategory",
+                        "beneficiaryName",
+                        "linkedPoliciesCount",
+                        "createdAt",
+                        "updatedAt",
+                      ].map((field) => (
+                        <div key={field}>
+                          <dt>{field.replace(/([A-Z])/g, " $1")}</dt>
+                          <dd>{String(data.profile.user[field] ?? "—")}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </section>
+                )}
                 <Form
-                  key={user.id}
+                  key={`${user.id}:${data.profile?.user?.updatedAt || ""}`}
                   title="Update your contact information"
                   keys={fields.profile}
                   initial={data.profile?.user || {}}
@@ -367,11 +613,12 @@ export default function Home() {
                   items={amendments}
                   columns={["policyId", "requestedValue", "status", "id"]}
                 />
-                {has(user, "customer", "agent", "admin") && (
+                {has(user, "customer", "agent", "service", "admin") && (
                   <Form
                     title="Request policy amendment"
                     keys={fields.amendment}
                     initial={{ requestType: "coverageAmount" }}
+                    policies={policies}
                     onSubmit={(x) => action("/amendments", "POST", x)}
                   />
                 )}
@@ -395,10 +642,11 @@ export default function Home() {
                   items={reductions}
                   columns={["policyId", "requestedCoverage", "status", "id"]}
                 />
-                {has(user, "customer", "agent", "admin") && (
+                {has(user, "customer", "agent", "service", "admin") && (
                   <Form
                     title="Request coverage reduction"
                     keys={fields.reduction}
+                    policies={policies}
                     onSubmit={(x) => action("/reductions", "POST", x)}
                   />
                 )}
@@ -428,16 +676,25 @@ export default function Home() {
                     "id",
                   ]}
                 />
-                {has(user, "customer", "admin") && (
+                {has(user, "customer", "service", "admin") && (
                   <Form
                     title="Submit insurance claim"
                     keys={fields.claim}
+                    policies={policies}
                     onSubmit={(x) => action("/claims", "POST", x)}
                   />
                 )}
                 {has(user, "adjuster", "admin") && (
                   <Decision
-                    items={claims.filter((c) => c.status === "submitted")}
+                    isClaim
+                    onStartReview={(id) =>
+                      action(`/claims/${id}/status`, "PATCH", {
+                        status: "under_review",
+                      })
+                    }
+                    items={claims.filter((c) =>
+                      ["submitted", "under_review"].includes(c.status),
+                    )}
                     onDecision={(id, decision, comment) =>
                       action(`/claims/${id}/decision`, "PATCH", {
                         decision,
@@ -464,19 +721,74 @@ export default function Home() {
                 />
                 {has(user, "admin") && (
                   <>
-                    <Form
-                      title="Create user"
-                      keys={[
-                        "username",
-                        "password",
-                        "firstName",
-                        "lastName",
-                        "email",
-                      ]}
-                      onSubmit={(x) =>
-                        action("/users", "POST", { ...x, roles: ["customer"] })
-                      }
-                    />
+                    <section className="panel">
+                      <h3>Create customer or staff account</h3>
+                      <label>
+                        Initial role
+                        <select
+                          value={newUserRole}
+                          onChange={(e) => setNewUserRole(e.target.value)}
+                        >
+                          {(data.roles?.roles || ["customer"]).map((role) => (
+                            <option key={role} value={role}>
+                              {role}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <Form
+                        title="Create user"
+                        keys={[
+                          "username",
+                          "password",
+                          "firstName",
+                          "lastName",
+                          "email",
+                        ]}
+                        onSubmit={(x) =>
+                          action("/users", "POST", {
+                            ...x,
+                            roles: [newUserRole],
+                          })
+                        }
+                      />
+                    </section>
+                    <section className="panel">
+                      <h3>View and edit user profile</h3>
+                      <label>
+                        Select user
+                        <select
+                          value={selectedUserId}
+                          onChange={(e) => openProfile(e.target.value)}
+                        >
+                          <option value="">Choose a user</option>
+                          {users.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.username} — {u.firstName} {u.lastName}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {selectedProfile && (
+                        <>
+                          <p>
+                            <b>Account:</b> {selectedProfile.status} ·{" "}
+                            <b>Roles:</b> {selectedProfile.roles.join(", ")} ·{" "}
+                            <b>Linked policies:</b>{" "}
+                            {selectedProfile.linkedPoliciesCount}
+                          </p>
+                          <Form
+                            key={`${selectedProfile.id}:${selectedProfile.updatedAt}`}
+                            title="Edit user profile"
+                            keys={fields.adminProfile}
+                            initial={selectedProfile}
+                            onSubmit={(x) =>
+                              action(`/users/${selectedProfile.id}`, "PATCH", x)
+                            }
+                          />
+                        </>
+                      )}
+                    </section>
                     <StatusUsers
                       users={users}
                       onChange={(id, status) =>
@@ -486,6 +798,60 @@ export default function Home() {
                   </>
                 )}
               </>
+            )}
+            {tab === "users" &&
+              has(user, "compliance", "agent", "service") &&
+              !has(user, "admin") && (
+                <section className="panel">
+                  <h3>
+                    {has(user, "service", "agent")
+                      ? "Customer support directory"
+                      : "Read-only user profile view"}
+                  </h3>
+                  <select
+                    value={selectedUserId}
+                    onChange={(e) => openProfile(e.target.value)}
+                  >
+                    <option value="">Choose a user</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.username}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedProfile && (
+                    <>
+                      <p>
+                        {selectedProfile.username}: {selectedProfile.firstName}{" "}
+                        {selectedProfile.lastName} — {selectedProfile.status}
+                        {selectedProfile.roles &&
+                          ` (${selectedProfile.roles.join(", ")})`}
+                      </p>
+                      {has(user, "service") && (
+                        <Form
+                          key={`${selectedProfile.id}:${selectedProfile.updatedAt || ""}`}
+                          title="Update customer contact details"
+                          keys={fields.supportProfile}
+                          initial={selectedProfile}
+                          onSubmit={(x) =>
+                            action(
+                              `/users/${selectedProfile.id}/contact`,
+                              "PATCH",
+                              x,
+                            )
+                          }
+                        />
+                      )}
+                    </>
+                  )}
+                </section>
+              )}
+            {tab === "audits" && has(user, "admin", "compliance") && (
+              <Collection
+                name="Recent access and transaction audit events"
+                items={audits}
+                columns={["at", "by", "action", "target"]}
+              />
             )}
             {tab === "rbac" && has(user, "admin") && (
               <RoleEditor
@@ -542,7 +908,7 @@ function Collection({ name, items, columns }) {
     </section>
   );
 }
-function Decision({ items, onDecision }) {
+function Decision({ items, onDecision, isClaim = false, onStartReview }) {
   const [comments, setComments] = useState({});
   return (
     <section className="panel">
@@ -563,6 +929,11 @@ function Decision({ items, onDecision }) {
                 setComments({ ...comments, [i.id]: e.target.value })
               }
             />
+            {isClaim && i.status === "submitted" && (
+              <button className="secondary" onClick={() => onStartReview(i.id)}>
+                Start review
+              </button>
+            )}
             <button
               onClick={() => onDecision(i.id, "approved", comments[i.id] || "")}
             >

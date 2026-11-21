@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { load } from "../services/db.js";
+import { policyVisible as visible } from "../services/access.js";
 import { fail } from "../utils/errors.js";
 export const authenticate = (req, res, next) => {
   const match = /^Bearer (\S+)$/i.exec(req.headers.authorization || "");
@@ -12,6 +13,8 @@ export const authenticate = (req, res, next) => {
   } catch {
     fail(401, "Invalid or expired token");
   }
+  if (!payload.userId || payload.userId !== payload.sub)
+    fail(401, "Invalid token identity");
   const user = load().users.find((u) => u.id === payload.sub);
   if (!user || user.status !== "active" || user.authVersion !== payload.ver)
     fail(401, "Account or token is no longer active");
@@ -32,25 +35,11 @@ export const selfOrAdmin = (req, res, next) => {
 };
 export const customerOwns = (db, policy, actor) => {
   if (!policy) fail(404, "Policy not found");
-  if (actor.roles.includes("customer") && policy.customerId !== actor.id)
+  if (
+    actor.roles.includes("customer") &&
+    !actor.roles.includes("admin") &&
+    policy.customerId !== actor.id
+  )
     fail(403, "Not your policy");
 };
-export const policyVisible = (db, policy, actor) => {
-  if (!policy) fail(404, "Policy not found");
-  const r = actor.roles;
-  if (r.includes("admin")) return true;
-  if (r.includes("customer")) return policy.customerId === actor.id;
-  if (r.includes("agent"))
-    return (
-      policy.createdBy === actor.id ||
-      db.users.find((u) => u.id === policy.customerId)?.assignedAgentId ===
-        actor.id
-    );
-  if (
-    r.some((x) =>
-      ["underwriter", "adjuster", "service", "compliance"].includes(x),
-    )
-  )
-    return true;
-  return false;
-};
+export const policyVisible = visible;

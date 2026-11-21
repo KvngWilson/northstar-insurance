@@ -41,6 +41,18 @@ rbac.delete(
     const role = oneOf(req.params.role, ROLES, "role");
     if (req.user.id === u.id && role === "admin")
       fail(400, "Cannot remove own admin role");
+    if (
+      role === "admin" &&
+      u.roles.includes("admin") &&
+      u.status === "active" &&
+      !db.users.some(
+        (other) =>
+          other.id !== u.id &&
+          other.status === "active" &&
+          other.roles.includes("admin"),
+      )
+    )
+      fail(409, "Cannot remove last active administrator");
     if (u.roles.includes(role)) {
       if (u.roles.length === 1) fail(400, "User must retain one role");
       u.roles = u.roles.filter((r) => r !== role);

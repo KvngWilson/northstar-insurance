@@ -330,3 +330,25 @@ th {
     display: none;
   }
 }
+
+.profilegrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px 20px;
+  margin: 0;
+}
+.profilegrid div {
+  min-width: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid #e9edf4;
+}
+.profilegrid dt {
+  font-size: 12px;
+  text-transform: capitalize;
+  color: #718096;
+}
+.profilegrid dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+  font-weight: 550;
+}

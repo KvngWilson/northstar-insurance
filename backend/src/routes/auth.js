@@ -24,7 +24,13 @@ auth.post(
     u.lastLogin = stamp();
     save(db);
     const token = jwt.sign(
-      { sub: u.id, username: u.username, roles: u.roles, ver: u.authVersion },
+      {
+        sub: u.id,
+        userId: u.id,
+        username: u.username,
+        roles: u.roles,
+        ver: u.authVersion,
+      },
       process.env.JWT_SECRET,
       { algorithm: "HS256", expiresIn: process.env.JWT_EXPIRES_IN || "1h" },
     );

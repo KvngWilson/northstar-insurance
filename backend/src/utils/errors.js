@@ -36,7 +36,8 @@ export const isoDate = (v, name) => {
   if (
     typeof v !== "string" ||
     !/^\d{4}-\d{2}-\d{2}$/.test(v) ||
-    Number.isNaN(Date.parse(v))
+    Number.isNaN(Date.parse(v)) ||
+    new Date(v).toISOString().slice(0, 10) !== v
   )
     fail(400, `Invalid ${name}`);
   return v;

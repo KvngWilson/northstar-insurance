@@ -11,12 +11,29 @@ const blank = () => ({
   claims: [],
   audits: [],
 });
+const identityFields = {
+  users: "userId",
+  policies: "policyId",
+  amendments: "amendmentId",
+  reductions: "reductionId",
+  claims: "claimId",
+};
+const normalize = (db) => {
+  // Add the field names used by the lab to old JSON stores without changing UUIDs.
+  for (const [collection, alias] of Object.entries(identityFields)) {
+    db[collection] ||= [];
+    for (const row of db[collection]) row[alias] ||= row.id;
+  }
+  db.audits ||= [];
+  return db;
+};
 export const load = () => {
   const p = file();
-  if (!fs.existsSync(p)) return blank();
-  return JSON.parse(fs.readFileSync(p, "utf8"));
+  if (!fs.existsSync(p)) return normalize(blank());
+  return normalize(JSON.parse(fs.readFileSync(p, "utf8")));
 };
 export const save = (db) => {
+  normalize(db);
   const p = file();
   fs.mkdirSync(path.dirname(p), { recursive: true });
   const temp = p + ".tmp";
